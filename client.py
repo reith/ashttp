@@ -1,0 +1,159 @@
+from twisted.internet import reactor
+from twisted.internet.protocol import ClientFactory
+from twisted.web import http
+from twisted.web.http_headers import Headers
+
+import cPickle
+from base64 import b64encode, b64decode
+
+import logging
+logger = logging.getLogger('application')
+fh = logging.FileHandler('client.log')
+logger.setLevel(logging.INFO)
+logger.addHandler(fh)
+
+import tunnel
+
+noisy = True
+debug = True
+
+def dump_hex_string(str):
+	for s in str:
+		print ('%x' % ord(s)),
+
+class HTTPRequest(tunnel.Request):
+	"""HTTP Request comes from actual proxy or client"""
+
+	def alteredRequest(self):
+		"""Obfsucate request"""
+
+		method = self.method
+		uri = 'index.php'
+		received_headers = self.getAllHeaders().copy()
+		headers = {}
+		# add additional data to headers
+		received_headers['req-uri'] = self.uri
+		version = received_headers['req-version'] = self.clientproto
+		# pack real headers & additional data
+		headers['cookie'] = b64encode(cPickle.dumps(received_headers).encode('zlib'))
+		# change headers visible on wire
+		headers['host'] = b'luna.ir'
+		headers['connection'] = b'keep-alive'
+
+		if self.method == b'CONNECT':
+			headers['tunnel'] = 'start'
+			method = 'GET'
+			self.channel.setTunnelStatus(tunnel.TCPTunnelStatus.BEFORE_NEGOTIATION)
+			version = b'HTTP/1.1'
+		elif self.method == b'POST':
+			headers['content-length'] = received_headers['content-length']
+
+		self.content.seek(0, 0)
+		return ((method, uri, version), headers, self.content.read())
+
+	def alterResponse(self):
+		"""
+		Deobfuscate response
+		"""
+
+		old_headers = self.responseHeaders
+		if self.channel.tunnelStatus() == tunnel.TCPTunnelStatus.HEADERS_SENT_TO_SERVER:
+			if self.code == 200:
+				self.code_message = b'Connection established'
+			headers = Headers()
+		else:
+			pickled_origin_headers = self.responseHeaders.getRawHeaders('set-cookie')
+			if pickled_origin_headers is None:
+				headers = Headers()
+			else:
+				headers = cPickle.loads(b64decode(pickled_origin_headers[0]).decode('zlib'))
+
+		self._responseAltered = True
+		self.responseHeaders = headers
+		return old_headers
+
+
+class Server(tunnel.HTTPResponder):
+	"""
+	HTTP tunnel client. obfuscates messages.
+	"""
+
+	requestFactory = HTTPRequest
+	# use a timeout in not tunnel mode
+	_HTTPModeTimeout = 300
+	timeOut = _HTTPModeTimeout
+
+	def rawDataReceived(self, data):
+		"""
+		If this server is acting as TCP Tunnel begining point, It should work in raw mode
+		"""
+		if self.tunnelStatus():
+			self.client.writeTCPTunneledData(data)
+		else:
+			http.HTTPChannel.rawDataReceived(self, data)
+	
+	def tcpTunnelingStarted(self):
+		self.transport.write(b'\r\n')
+		self.setRawMode()
+		self.client.consumer = self.transport
+		self.setTimeout(None)
+
+	def tcpTunnelingFinished(self):
+		logger.debug('%s: TCP TUNNELING FINISHED' % self.responderID())
+		self.setLineMode()
+		self._tunnelStatus = 0
+		self.client._chunkProcessing = False
+		self._clientStatus = tunnel.OwningClientStatus.ENDED
+		self.setTimeout(self._HTTPModeTimeout)
+
+	def connectionLost(self, reason):
+		"""
+		Prehandler for connection closing on TCP tunneling.
+		"""
+		if self.tunnelStatus() >= tunnel.TCPTunnelStatus.HEADERS_SENT_TO_SERVER:
+			# XXX: handle other tunnel states..
+			self.client.handleResponseEnd()
+			# it finishes request. so it must not call errback on:
+			# HTTPChannel.connectionLost > .requests[0].connectionLost > .notifications.errback
+		tunnel.HTTPResponder.connectionLost(self, reason)
+
+class Client(tunnel.HTTPRequester):
+	"""
+	HTTP Client for tunnel client
+	"""
+
+	def writeTCPTunneledData(self, data):
+		assert self.server.tunnelStatus() == tunnel.TCPTunnelStatus.ESTABLISHED
+		self.sendCommand(b'POST', b'/send.php', b'HTTP/1.1')
+		self.sendHeader(b'Content-Length', len(data))
+		self.endHeaders()
+		tunnel.HTTPRequester.writeTCPTunneledData(self, data)
+
+	def handleChunk(self, data):	
+		return self.handleResponsePart(data, False)
+
+class HTTPClientFactory(tunnel.HTTPClientFactory):
+	protocol = Client
+
+class TunnelClientFactory(tunnel.TunnelFactory):
+	protocol = Server
+
+from twisted.application import internet, service
+
+class TunnelClientService(tunnel.TunnelService):
+	_clientPool = []
+	_useClientPool = True
+	_minIdleClients = 2
+	_maxTCPConnections = 2
+
+	clientFactory = HTTPClientFactory
+	serverFactory = TunnelClientFactory
+
+	remote_host = 'xx.xx.xx.xx'
+	remote_port = 1234
+	
+application = service.Application('HttpTunnelClient')
+serviceCollection = service.IServiceCollection(application)
+tunnel_client = TunnelClientService(reactor)
+tunnel_client.setServiceParent(serviceCollection)
+internet.TCPServer(8080, tunnel_client.getServerFactory()).setServiceParent(serviceCollection)
