@@ -1,0 +1,45 @@
+#!/bin/env python
+
+import sys
+from argparse import ArgumentParser, REMAINDER
+
+from twisted.application import service
+from twisted.internet import reactor
+
+from ashttp.server import TunnelServerService
+
+def run_with_twistd(options):
+	from twisted.scripts.twistd import run
+	if options:
+		sys.argv[1:] = options
+	else:
+		# XXX
+		sys.argv[1:] = ['-o']
+
+	application = service.Application('HttpTunnelServer')
+	service.loadApplication = lambda f, k, p=None: application
+	run()
+	
+
+if __name__ == '__main__':
+	arg_parser = ArgumentParser(description='Clone an http tunnel server')
+	arg_parser.add_argument('listen_port', type=int)
+	arg_parser.add_argument('-P', '--proxy-server', required=True, metavar='ip:port', help='IP and port of remote proxy server')
+	arg_parser.add_argument('-t', '--twistd', nargs=REMAINDER, help='Run by twistd. later options will passed to twistd')
+	parsed_args = arg_parser.parse_args()
+
+	try:
+		proxy_ip, proxy_port = parsed_args.proxy_server.split(':')
+		proxy_port = int(proxy_port)
+	except ValueError:
+		arg_parser.error("Invalid IP and Port for proxy server")
+
+	TunnelServerService.remote_host = proxy_ip
+	TunnelServerService.remote_port = proxy_port
+	tunnel_server = TunnelServerService(reactor)
+	reactor.listenTCP(parsed_args.listen_port, tunnel_server.getServerFactory())
+
+	if parsed_args.twistd is not None:
+		run_with_twistd(parsed_args.twistd)
+	else:
+		reactor.run()

@@ -12,7 +12,7 @@ fh = logging.FileHandler('server.log')
 logger.setLevel(logging.DEBUG)
 logger.addHandler(fh)
 
-import tunnel
+from ashttp import tunnel
 from twisted.application import internet, service
 
 class ObfuscatedRequest(tunnel.Request):
@@ -137,12 +137,3 @@ class TunnelServerService(tunnel.TunnelService):
 
 	clientFactory = HTTPClientFactory
 	serverFactory = TunnelServerFactory
-
-	remote_host = '127.0.0.1'
-	remote_port = 3128
-	
-application = service.Application('HttpTunnelServer')
-serviceCollection = service.IServiceCollection(application)
-tunnel_server = TunnelServerService(reactor)
-tunnel_server.setServiceParent(serviceCollection)
-internet.TCPServer(1234, tunnel_server.getServerFactory()).setServiceParent(serviceCollection)

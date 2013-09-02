@@ -456,7 +456,7 @@ class HTTPRequester(http.HTTPClient):
 			self.transport.loseConnection()
 
 		if not self.isReady:
-			logger.debug('%s: DETACHED A NOT YET READY CLIENT. SEE WHETHER IT WILL REUSED' % self.requesterID())
+			logger.warn('%s: DETACHED A NOT YET READY CLIENT. SEE WHETHER IT WILL REUSED' % self.requesterID())
 		logger.debug('%s: DETACHED' % self.requesterID())
 
 
@@ -518,7 +518,6 @@ class TunnelService(service.Service):
 	_connectorPool = []
 	_useClientPool = None # True or False
 	_minIdleClients = None
-	_maxTCPConnections = None # do it!
 
 	clientFactory = HTTPClientFactory
 	serverFactory = TunnelFactory
@@ -532,6 +531,7 @@ class TunnelService(service.Service):
 
 		if self._useClientPool:
 			self.makePoolFull()
+
 
 	def _pickIdleClient(self):
 		"""

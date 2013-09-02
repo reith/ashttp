@@ -12,10 +12,7 @@ fh = logging.FileHandler('client.log')
 logger.setLevel(logging.INFO)
 logger.addHandler(fh)
 
-import tunnel
-
-noisy = True
-debug = True
+from ashttp import tunnel
 
 def dump_hex_string(str):
 	for s in str:
@@ -148,12 +145,3 @@ class TunnelClientService(tunnel.TunnelService):
 
 	clientFactory = HTTPClientFactory
 	serverFactory = TunnelClientFactory
-
-	remote_host = 'xx.xx.xx.xx'
-	remote_port = 1234
-	
-application = service.Application('HttpTunnelClient')
-serviceCollection = service.IServiceCollection(application)
-tunnel_client = TunnelClientService(reactor)
-tunnel_client.setServiceParent(serviceCollection)
-internet.TCPServer(8080, tunnel_client.getServerFactory()).setServiceParent(serviceCollection)

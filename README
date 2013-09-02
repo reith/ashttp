@@ -13,10 +13,9 @@ If (A) supports talking with CONNECT and (B) be capable of serving it, this can
 be used to pass TCP streams (e.g SSL, SSH) Although traffic passed between
 tunnel endpoints are not CONNECT packets. Actually you can change shape of data
 (adding encryption, fake headers reformatting) in alterResponse() and
-alteredRequest(). If the firewall which you're trying to bypass, has some limits
-on TCP connections, you might want to change connection pool options too,
-otherwise probably it's be better to turn it off utterly. 
+alteredRequest(). If the firewall which you're trying to bypass, has some
+limitations on TCP connections, you might want to change connection pool options
+too, otherwise probably it's be better to turn it off utterly. 
 
-Provide proper IP/Port in client.py and server.py according to your network
-setup. run server.py in server and client.py on client end of tunnel with
-twistd.
+Provide proper arguments to `ashttpc` or `ashttps` according to your network
+setup.
