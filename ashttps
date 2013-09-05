@@ -3,29 +3,15 @@
 import sys
 from argparse import ArgumentParser, REMAINDER
 
-from twisted.application import service
 from twisted.internet import reactor
-
 from ashttp.server import TunnelServerService
-
-def run_with_twistd(options):
-	from twisted.scripts.twistd import run
-	if options:
-		sys.argv[1:] = options
-	else:
-		# XXX
-		sys.argv[1:] = ['-o']
-
-	application = service.Application('HttpTunnelServer')
-	service.loadApplication = lambda f, k, p=None: application
-	run()
-	
+from ashttp.runner import run_with_twistd 
 
 if __name__ == '__main__':
 	arg_parser = ArgumentParser(description='Clone an http tunnel server')
 	arg_parser.add_argument('listen_port', type=int)
 	arg_parser.add_argument('-P', '--proxy-server', required=True, metavar='ip:port', help='IP and port of remote proxy server')
-	arg_parser.add_argument('-t', '--twistd', nargs=REMAINDER, help='Run by twistd. later options will passed to twistd')
+	arg_parser.add_argument('-t', '--twistd', nargs=REMAINDER, help='Run by twistd. Next options will redirected to twistd')
 	parsed_args = arg_parser.parse_args()
 
 	try:
@@ -40,6 +26,6 @@ if __name__ == '__main__':
 	reactor.listenTCP(parsed_args.listen_port, tunnel_server.getServerFactory())
 
 	if parsed_args.twistd is not None:
-		run_with_twistd(parsed_args.twistd)
+		run_with_twistd(parsed_args.twistd, 'HttpTunnelServer')
 	else:
 		reactor.run()

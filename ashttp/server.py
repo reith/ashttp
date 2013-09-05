@@ -1,25 +1,19 @@
-from twisted.internet import reactor
 from twisted.internet.protocol import ClientFactory
 from twisted.web import http
 from twisted.web.http_headers import Headers
+from twisted.python.log import logging
 
 from base64 import b64encode, b64decode
 import cPickle
 
-import logging
-logger = logging.getLogger('application')
-fh = logging.FileHandler('server.log')
-logger.setLevel(logging.DEBUG)
-logger.addHandler(fh)
+logger = logging.getLogger()
 
 from ashttp import tunnel
-from twisted.application import internet, service
 
 class ObfuscatedRequest(tunnel.Request):
 	"""
 	Obfuscated Request sent from client end of tunnel
 	"""
-
 	def process(self):
 		if self.channel.tunnelStatus() == tunnel.TCPTunnelStatus.ESTABLISHED:
 			if self.method == b'POST':
@@ -35,7 +29,6 @@ class ObfuscatedRequest(tunnel.Request):
 		else:
 			tunnel.Request.process(self)
 
-
 	def __cleanup(self):
 		"""
 		Cleanup fake request
@@ -43,7 +36,6 @@ class ObfuscatedRequest(tunnel.Request):
 		del self.channel
 		self.content.close()
 		del self.content
-
 
 	def alteredRequest(self):
 		assert not self.channel.tunnelStatus()
@@ -54,20 +46,16 @@ class ObfuscatedRequest(tunnel.Request):
 		version = headers.pop('req-version')
 		self.content.seek(0, 0)
 		data = self.content.read()
-
 		if self.method == b'GET' and received_headers.get('tunnel', False):
 			method = b'CONNECT'
 			self.channel.setTunnelStatus(tunnel.TCPTunnelStatus.BEFORE_NEGOTIATION)
-		
 		return ((method, uri, version), headers, data)
 
 	def alterResponse(self):
 		if self.startedWriting:
 			raise RuntimeError
-
 		old_headers = self.responseHeaders
 		headers = Headers()
-
 		if self.channel.tunnelStatus():
 			headers.addRawHeader(b'content-type', b'gzip')
 			if self.code == 200: # hide connection established
@@ -78,11 +66,11 @@ class ObfuscatedRequest(tunnel.Request):
 				val = self.responseHeaders.getRawHeaders(must_kept_key)
 				if val is not None:
 					headers.addRawHeader(must_kept_key, val[0])
-
 		headers.addRawHeader(b'connection', b'keep-alive')
 		self.responseHeaders = headers
 		self._responseAltered = True
 		return old_headers
+
 
 class Server(tunnel.HTTPResponder):
 	"""
@@ -97,6 +85,7 @@ class Server(tunnel.HTTPResponder):
 		logger.debug('%s: TCP TUNNELING FINISHED' % self.responderID())
 		self._clientStatus = tunnel.OwningClientStatus.ENDED
 		self._tunnelStatus = 0
+
 
 class Client(tunnel.HTTPRequester):
 
@@ -123,12 +112,14 @@ class Client(tunnel.HTTPRequester):
 		else:
 			tunnel.HTTPRequester.connectionLost(self, reason)
 
+
 class HTTPClientFactory(tunnel.HTTPClientFactory):
 	protocol = Client
 
 
 class TunnelServerFactory(tunnel.TunnelFactory):
 	protocol = Server
+
 
 class TunnelServerService(tunnel.TunnelService):
 	_clientPool = []

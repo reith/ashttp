@@ -1,24 +1,25 @@
-from twisted.web import http
 from io import BytesIO as StringIO
 
-import logging
-logger = logging.getLogger('application')
-
 from twisted.internet.protocol import ClientFactory
+from twisted.web import http
 from twisted.application import service
 from twisted.internet.endpoints import TCP4ClientEndpoint
 from twisted.internet import defer, error
+from twisted.python.log import logging
 
+logger = logging.getLogger()
 
 class TCPTunnelStatus:
 	BEFORE_NEGOTIATION = 1
 	HEADERS_SENT_TO_SERVER = 2
 	ESTABLISHED = 3
 
+
 class ClientStatus:
 	ATTACHED = 1
 	DETACHED = 2
 	ENDED = 3
+
 
 class OwningClientStatus:
 	HAVING = 1
@@ -26,8 +27,10 @@ class OwningClientStatus:
 	LACKING = 3
 	ENDED = 4
 
+
 class NotProccessingRequest(ValueError):
 	pass
+
 
 class Request(http.Request):
 	_responseAltered = False
@@ -107,18 +110,15 @@ class HTTPResponder(http.HTTPChannel):
 		if self.tunnelStatus() :
 			logger.warn("%s: WARNING: DETACH ON TUNNEL MODE" % self.responderID())
 			self._tunnelStatus = 0
-
 		if self.client is None:
 			logger.debug('%s: CLIENT ALREADY DETACHED' % self.responderID())
 			return
-
 		logger.debug('%s: DETACHING (reason: %s)', self.responderID(), reason)
 		self.client.reason = reason
 		client = self.client
 		self.client = None
 		self._clientStatus = OwningClientStatus.LACKING
 		client.detached()
-
 	
 	def responderID(self):
 		return '[server #%s]' % self.instanceID
@@ -144,15 +144,12 @@ class HTTPResponder(http.HTTPChannel):
 		self._clientStatus = OwningClientStatus.HAVING
 		client.attached()
 
-
 	def connectionMade(self):
 		logger.info('%s: NEW SERVER' % self.responderID())
-
 
 	def connectionLost(self,  reason):
 		logger.info('%s: LOST (reason=%s)' % (self.responderID(), reason))
 		http.HTTPChannel.connectionLost(self, reason)
-
 		client = self.client
 		if client is not None:
 			# first set client as lacking server. for ease in handling closing
@@ -163,13 +160,11 @@ class HTTPResponder(http.HTTPChannel):
 				client.transport.loseConnection()
 		del self.factory
 
-
 	def tcpTunnelingStarted(self):
 		"""
 		Called when TCP tunnel established
 		"""
 		raise NotImplemented
-
 
 	def tcpTunnelingFinished(self):
 		"""
@@ -181,7 +176,6 @@ class HTTPRequester(http.HTTPClient):
 	"""
 	Simple HTTP Client to handle encoding aware transfer
 	"""
-
 	consumer = None
 	isReady = True
 	_chunkProcessing = False
@@ -209,7 +203,6 @@ class HTTPRequester(http.HTTPClient):
 
 	def handleChunk(self, data):
 		return self.handleResponsePart(data)
-
 
 	def handleResponsePart(self, data, bufferize=True):
 		"""
@@ -288,9 +281,7 @@ class HTTPRequester(http.HTTPClient):
 			for key, val in headers.items():
 				self.sendHeader(key, val)
 			self.endHeaders()
-
 		self.transport.write(data)
-
 		self.request.registerProducer(self, True)
 		if self.server.tunnelStatus():
 			self.server.setTunnelStatus(TCPTunnelStatus.HEADERS_SENT_TO_SERVER, TCPTunnelStatus.BEFORE_NEGOTIATION)
@@ -316,12 +307,10 @@ class HTTPRequester(http.HTTPClient):
 		must not depend to server and request.
 		"""
 		logger.debug('%s: RESET' % self.requesterID())
-
 		if self._chunkProcessing:
 			# should be reduced in favour of tcpTunnelingFinished
 			logger.debug('%s: CHUNKMODE IN RESET' % (self.requesterID()))
 			self._chunkProcessing = False
-
 		self._cleanBuffer()
 		self.isReady = True
 		self._setStatusWaitingMode()
@@ -329,15 +318,12 @@ class HTTPRequester(http.HTTPClient):
 	def handleResponseEnd(self):
 		logger.debug('%s: RESPONSE END' % self.requesterID())
 		http.HTTPClient.handleResponseEnd(self)
-
 		self.consumer = None
 		self.request.unregisterProducer()
 		self.request.finish()
 
-
 	def handleResponse(self, resp):
 		self.consumer.write(resp)
-
 
 	def handleHeader(self, key, val):
 		"""
@@ -390,7 +376,6 @@ class HTTPRequester(http.HTTPClient):
 		"""
 		self._comingDataIsNotRaw = True
 
-
 	def handleStatus(self, version, status, message):
 		try:
 			self.request.setResponseCode(int(status), message)
@@ -403,7 +388,6 @@ class HTTPRequester(http.HTTPClient):
 
 	def connectionLost(self, reason):
 		logger.info('%s: LOST (reason=%s)' % (self.requesterID(), reason))
-
 		# ------->8----- debug. just report
 		if not self.factory.service._useClientPool:
 			if self.isReady:
@@ -414,7 +398,6 @@ class HTTPRequester(http.HTTPClient):
 			if not self.isReady:
 				logger.debug('%s: W_CLOSE_3 NOT ENDED CLIENT DIED IN POOLED SERVICE' % self.requesterID())
 		# ------>8---------
-
 		if self.server is not None and self._status != ClientStatus.ENDED:
 			server = self.server
 			server_should_die = not self.factory.service._useClientPool
@@ -430,9 +413,7 @@ class HTTPRequester(http.HTTPClient):
 				server.detachClient('client lost itself')
 				if server_should_die:
 					server.transport.loseConnection()
-
 		self._cleanup(reason)
-
 
 	def _cleanup(self, close_reason):
 		"""
@@ -443,7 +424,6 @@ class HTTPRequester(http.HTTPClient):
 		self.consumer = None
 		self._cleanBuffer()
 
-
 	def detached(self):
 		"""
 		Server released this client.
@@ -451,14 +431,11 @@ class HTTPRequester(http.HTTPClient):
 		server = self.server
 		self.server = None
 		self._status = ClientStatus.DETACHED
-
 		if self.paused and not self.transport.disconnecting:
 			self.transport.loseConnection()
-
 		if not self.isReady:
 			logger.warn('%s: DETACHED A NOT YET READY CLIENT. SEE WHETHER IT WILL REUSED' % self.requesterID())
 		logger.debug('%s: DETACHED' % self.requesterID())
-
 
 class HTTPClientFactory(ClientFactory):
 	protocol = None
@@ -475,6 +452,7 @@ class HTTPClientFactory(ClientFactory):
 		if self.service._useClientPool:
 			self.service._clientPool.remove(client)
 			self.service.makePoolFull()
+
 
 class TunnelFactory(http.HTTPFactory):
 	protocol = None
@@ -494,14 +472,11 @@ class TunnelFactory(http.HTTPFactory):
 		"""
 		server._clientStatus = OwningClientStatus.REQUESTED
 		d = defer.maybeDeferred(self.service.pickClient)
-
 		def errback(error):
 			logger.error('Error on acquiring client: %s error' % error)
 			raise RuntimeError('Can\'t acquire client.')
-
 		d.addErrback(errback)
 		d.addCallbacks(self._attachClientIfServerAlive, lambda _: server.transport.loseConnection(), callbackArgs=(server,))
-
 
 	def _attachClientIfServerAlive(self, client, server):
 		if server.transport.connected:
@@ -528,10 +503,8 @@ class TunnelService(service.Service):
 	def __init__(self, reactor):
 		self._reactor = reactor
 		self.serverFactory.service = self.clientFactory.service = self
-
 		if self._useClientPool:
 			self.makePoolFull()
-
 
 	def _pickIdleClient(self):
 		"""
@@ -546,14 +519,12 @@ class TunnelService(service.Service):
 				return client
 		return None
 
-
 	def pickClient(self):
 		"""
 		Pick a idle client from pool or make new client.
 		"""
 		client = self._pickIdleClient() if self._useClientPool else None
 		return client if client is not None else self._newClient()
-
 
 	def makePoolFull(self):
 		"""
@@ -575,12 +546,10 @@ class TunnelService(service.Service):
 		"""
 		remote_ep = TCP4ClientEndpoint(self._reactor, self.remote_host, self.remote_port)
 		connector = remote_ep.connect(self.clientFactory())
-
 		if self._useClientPool:
 			def _add_to_pool(client):
 				logger.debug('MADE NEW CLIENT %s', str(client))
 				self._clientPool.append(client)
 				return client
 			connector.addCallback(_add_to_pool)
-
 		return connector

@@ -1,16 +1,12 @@
-from twisted.internet import reactor
 from twisted.internet.protocol import ClientFactory
 from twisted.web import http
 from twisted.web.http_headers import Headers
+from twisted.python.log import logging
 
 import cPickle
 from base64 import b64encode, b64decode
 
-import logging
-logger = logging.getLogger('application')
-fh = logging.FileHandler('client.log')
-logger.setLevel(logging.INFO)
-logger.addHandler(fh)
+logger = logging.getLogger()
 
 from ashttp import tunnel
 
@@ -23,7 +19,6 @@ class HTTPRequest(tunnel.Request):
 
 	def alteredRequest(self):
 		"""Obfsucate request"""
-
 		method = self.method
 		uri = 'index.php'
 		received_headers = self.getAllHeaders().copy()
@@ -52,7 +47,6 @@ class HTTPRequest(tunnel.Request):
 		"""
 		Deobfuscate response
 		"""
-
 		old_headers = self.responseHeaders
 		if self.channel.tunnelStatus() == tunnel.TCPTunnelStatus.HEADERS_SENT_TO_SERVER:
 			if self.code == 200:
@@ -64,7 +58,6 @@ class HTTPRequest(tunnel.Request):
 				headers = Headers()
 			else:
 				headers = cPickle.loads(b64decode(pickled_origin_headers[0]).decode('zlib'))
-
 		self._responseAltered = True
 		self.responseHeaders = headers
 		return old_headers
@@ -74,7 +67,6 @@ class Server(tunnel.HTTPResponder):
 	"""
 	HTTP tunnel client. obfuscates messages.
 	"""
-
 	requestFactory = HTTPRequest
 	# use a timeout in not tunnel mode
 	_HTTPModeTimeout = 300
@@ -114,11 +106,11 @@ class Server(tunnel.HTTPResponder):
 			# HTTPChannel.connectionLost > .requests[0].connectionLost > .notifications.errback
 		tunnel.HTTPResponder.connectionLost(self, reason)
 
+
 class Client(tunnel.HTTPRequester):
 	"""
 	HTTP Client for tunnel client
 	"""
-
 	def writeTCPTunneledData(self, data):
 		assert self.server.tunnelStatus() == tunnel.TCPTunnelStatus.ESTABLISHED
 		self.sendCommand(b'POST', b'/send.php', b'HTTP/1.1')
@@ -129,13 +121,14 @@ class Client(tunnel.HTTPRequester):
 	def handleChunk(self, data):	
 		return self.handleResponsePart(data, False)
 
+
 class HTTPClientFactory(tunnel.HTTPClientFactory):
 	protocol = Client
+
 
 class TunnelClientFactory(tunnel.TunnelFactory):
 	protocol = Server
 
-from twisted.application import internet, service
 
 class TunnelClientService(tunnel.TunnelService):
 	_clientPool = []
