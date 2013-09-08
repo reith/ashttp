@@ -1,18 +1,12 @@
 from twisted.internet.protocol import ClientFactory
 from twisted.web import http
 from twisted.web.http_headers import Headers
-from twisted.python.log import logging
 
 import cPickle
 from base64 import b64encode, b64decode
 
-logger = logging.getLogger()
-
 from ashttp import tunnel
-
-def dump_hex_string(str):
-	for s in str:
-		print ('%x' % ord(s)),
+from ashttp.logging import logger
 
 class HTTPRequest(tunnel.Request):
 	"""HTTP Request comes from actual proxy or client"""

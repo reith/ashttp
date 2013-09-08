@@ -6,6 +6,7 @@ from argparse import ArgumentParser, REMAINDER
 from twisted.internet import reactor
 from ashttp.client import TunnelClientService
 from ashttp.runner import run_with_twistd 
+from ashttp.logging import logger
 
 if __name__ == '__main__':
 	arg_parser = ArgumentParser(description='Clone an http tunnel client')
@@ -19,6 +20,8 @@ if __name__ == '__main__':
 		server_port = int(server_port)
 	except ValueError:
 		arg_parser.error("Invalid IP and Port for tunnel server")
+
+	logger.useTwistdLogger() if parsed_args.twistd is not None else logger.usePythonStdLogger()
 
 	TunnelClientService.remote_host = server_ip
 	TunnelClientService.remote_port = server_port

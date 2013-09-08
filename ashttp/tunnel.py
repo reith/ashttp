@@ -5,9 +5,8 @@ from twisted.web import http
 from twisted.application import service
 from twisted.internet.endpoints import TCP4ClientEndpoint
 from twisted.internet import defer, error
-from twisted.python.log import logging
 
-logger = logging.getLogger()
+from .logging import logger
 
 class TCPTunnelStatus:
 	BEFORE_NEGOTIATION = 1
@@ -126,12 +125,12 @@ class HTTPResponder(http.HTTPChannel):
 	def setTunnelStatus(self, val, dependto=None):
 		if dependto is not None:
 			if self._tunnelStatus != dependto:
-				logging.error('%s: !! FSA BUG. expected current state %d but have %d' % (self.responderID(), dependto, 
+				logger.error('%s: !! FSA BUG. expected current state %d but have %d' % (self.responderID(), dependto, 
 				self._tunnelStatus))
 				raise RuntimeError()
 		oldval = self._tunnelStatus
 		self._tunnelStatus = val
-		logging.info("%s : TCP STATUS CHANGED %s => %s" % (self.responderID(), oldval, val))
+		logger.info("%s : TCP STATUS CHANGED %s => %s" % (self.responderID(), oldval, val))
 
 	def attachClient(self, client):
 		"""
@@ -172,6 +171,7 @@ class HTTPResponder(http.HTTPChannel):
 		"""
 		raise NotImplemented
 		
+
 class HTTPRequester(http.HTTPClient):
 	"""
 	Simple HTTP Client to handle encoding aware transfer
@@ -436,6 +436,7 @@ class HTTPRequester(http.HTTPClient):
 		if not self.isReady:
 			logger.warn('%s: DETACHED A NOT YET READY CLIENT. SEE WHETHER IT WILL REUSED' % self.requesterID())
 		logger.debug('%s: DETACHED' % self.requesterID())
+
 
 class HTTPClientFactory(ClientFactory):
 	protocol = None

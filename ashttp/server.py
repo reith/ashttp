@@ -1,14 +1,12 @@
 from twisted.internet.protocol import ClientFactory
 from twisted.web import http
 from twisted.web.http_headers import Headers
-from twisted.python.log import logging
 
 from base64 import b64encode, b64decode
 import cPickle
 
-logger = logging.getLogger()
-
 from ashttp import tunnel
+from ashttp.logging import logger
 
 class ObfuscatedRequest(tunnel.Request):
 	"""
