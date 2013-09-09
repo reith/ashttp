@@ -2,11 +2,12 @@ from twisted.internet.protocol import ClientFactory
 from twisted.web import http
 from twisted.web.http_headers import Headers
 
-from base64 import b64encode, b64decode
 import cPickle
+from base64 import b64encode, b64decode
 
 from ashttp import tunnel
 from ashttp.logging import logger
+from ashttp.policies import KeepAliveParameters
 
 class ObfuscatedRequest(tunnel.Request):
 	"""
@@ -75,6 +76,8 @@ class Server(tunnel.HTTPResponder):
 	HTTP tunnel server. deobfuscates obfuscated messages.
 	"""
 	requestFactory = ObfuscatedRequest
+	keep_alive = True
+	keep_alive_params = KeepAliveParameters(300, 60, 2)
 
 	def tcpTunnelingStarted(self):
 		self.client.setRawMode()

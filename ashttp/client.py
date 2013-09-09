@@ -7,6 +7,7 @@ from base64 import b64encode, b64decode
 
 from ashttp import tunnel
 from ashttp.logging import logger
+from ashttp.policies import KeepAliveParameters
 
 class HTTPRequest(tunnel.Request):
 	"""HTTP Request comes from actual proxy or client"""
@@ -63,7 +64,7 @@ class Server(tunnel.HTTPResponder):
 	"""
 	requestFactory = HTTPRequest
 	# use a timeout in not tunnel mode
-	_HTTPModeTimeout = 300
+	_HTTPModeTimeout = 600
 	timeOut = _HTTPModeTimeout
 
 	def rawDataReceived(self, data):
@@ -105,6 +106,9 @@ class Client(tunnel.HTTPRequester):
 	"""
 	HTTP Client for tunnel client
 	"""
+	keep_alive = True
+	keep_alive_params = KeepAliveParameters(30, 30, 2)
+
 	def writeTCPTunneledData(self, data):
 		assert self.server.tunnelStatus() == tunnel.TCPTunnelStatus.ESTABLISHED
 		self.sendCommand(b'POST', b'/send.php', b'HTTP/1.1')

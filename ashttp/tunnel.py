@@ -6,6 +6,7 @@ from twisted.application import service
 from twisted.internet.endpoints import TCP4ClientEndpoint
 from twisted.internet import defer, error
 
+from .policies import TCPKeepAliveMixin
 from .logging import logger
 
 class TCPTunnelStatus:
@@ -64,7 +65,7 @@ class Request(http.Request):
 		raise NotImplemented
 
 
-class HTTPResponder(http.HTTPChannel):
+class HTTPResponder(http.HTTPChannel, TCPKeepAliveMixin):
 	"""
 	HTTP Server.
 	"""
@@ -145,6 +146,8 @@ class HTTPResponder(http.HTTPChannel):
 
 	def connectionMade(self):
 		logger.info('%s: NEW SERVER' % self.responderID())
+		if self.keep_alive:
+			self.makeSocketKeepAlive()
 
 	def connectionLost(self,  reason):
 		logger.info('%s: LOST (reason=%s)' % (self.responderID(), reason))
@@ -172,7 +175,7 @@ class HTTPResponder(http.HTTPChannel):
 		raise NotImplemented
 		
 
-class HTTPRequester(http.HTTPClient):
+class HTTPRequester(http.HTTPClient, TCPKeepAliveMixin):
 	"""
 	Simple HTTP Client to handle encoding aware transfer
 	"""
@@ -237,6 +240,8 @@ class HTTPRequester(http.HTTPClient):
 
 	def connectionMade(self):
 		logger.info('%s: NEW CLIENT' % self.requesterID())
+		if self.keep_alive:
+			self.makeSocketKeepAlive()
 
 	def sendCommand(self, command, path, version):
 		logger.info("%s: >>> %s %s %s" % (self.requesterID(), command, path, version))
