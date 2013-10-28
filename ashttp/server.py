@@ -5,9 +5,9 @@ from twisted.web.http_headers import Headers
 import cPickle
 from base64 import b64encode, b64decode
 
-from ashttp import tunnel
-from ashttp.logging import logger
-from ashttp.policies import KeepAliveParameters
+from . import tunnel
+from logging import logger
+from .policies import KeepAliveParameters
 
 class ObfuscatedRequest(tunnel.Request):
 	"""

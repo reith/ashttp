@@ -3,6 +3,7 @@ from __future__ import absolute_import
 __all__ = ['logger']
 
 class Logger:
+	_logger = None
 
 	def useTwistdLogger(self):
 		from twisted.python.log import logging
