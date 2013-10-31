@@ -43,7 +43,7 @@ class HTTPRequest(tunnel.Request):
 		Deobfuscate response
 		"""
 		old_headers = self.responseHeaders
-		if self.channel.tunnelStatus() == tunnel.TCPTunnelStatus.HEADERS_SENT_TO_SERVER:
+		if self.channel._tunnelStatus.is_headers_sent_to_server:
 			if self.code == 200:
 				self.code_message = b'Connection established'
 			headers = Headers()
@@ -71,7 +71,7 @@ class Server(tunnel.HTTPResponder):
 		"""
 		If this server is acting as TCP Tunnel begining point, It should work in raw mode
 		"""
-		if self.tunnelStatus():
+		if self._tunnelStatus._state:
 			self.client.writeTCPTunneledData(data)
 		else:
 			http.HTTPChannel.rawDataReceived(self, data)
@@ -83,18 +83,18 @@ class Server(tunnel.HTTPResponder):
 		self.setTimeout(None)
 
 	def tcpTunnelingFinished(self):
-		logger.debug('%s: TCP TUNNELING FINISHED' % self.responderID())
+		logger.debug('%s: TCP TUNNELING FINISHED' % self)
 		self.setLineMode()
-		self._tunnelStatus = 0
+		self._tunnelStatus.no_tunnel()
 		self.client._chunkProcessing = False
-		self._clientStatus = tunnel.OwningClientStatus.ENDED
+		self._clientStatus.ended()
 		self.setTimeout(self._HTTPModeTimeout)
 
 	def connectionLost(self, reason):
 		"""
 		Prehandler for connection closing on TCP tunneling.
 		"""
-		if self.tunnelStatus() >= tunnel.TCPTunnelStatus.HEADERS_SENT_TO_SERVER:
+		if self._tunnelStatus._state >= tunnel.TCPTunnelStatus.HEADERS_SENT_TO_SERVER:
 			# XXX: handle other tunnel states..
 			self.client.handleResponseEnd()
 			# it finishes request. so it must not call errback on:
@@ -110,7 +110,7 @@ class Client(tunnel.HTTPRequester):
 	keep_alive_params = KeepAliveParameters(30, 30, 2)
 
 	def writeTCPTunneledData(self, data):
-		assert self.server.tunnelStatus() == tunnel.TCPTunnelStatus.ESTABLISHED
+		assert self.server._tunnelStatus.is_established
 		self.sendCommand(b'POST', b'/send.php', b'HTTP/1.1')
 		self.sendHeader(b'Content-Length', len(data))
 		self.endHeaders()

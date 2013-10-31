@@ -14,7 +14,7 @@ class ObfuscatedRequest(tunnel.Request):
 	Obfuscated Request sent from client end of tunnel
 	"""
 	def process(self):
-		if self.channel.tunnelStatus() == tunnel.TCPTunnelStatus.ESTABLISHED:
+		if self.channel._tunnelStatus.is_established:
 			if self.method == b'POST':
 				del self.channel.requests[1] # suicide
 				self.content.seek(0,0)
@@ -22,8 +22,9 @@ class ObfuscatedRequest(tunnel.Request):
 				self.__cleanup()
 			else:
 				# while this is possible, tcp handling has problem and above if is not safe neither
-				logger.error('%s: NON_TCP_DATA_IN_TUNNEL_MODE: mode: %s, req: %r' % (self.channel.responderID(), self.channel.tunnelStatus(), self))
-				self.channel._tunnelStatus = 0
+				logger.error('%s: NON_TCP_DATA_IN_TUNNEL_MODE: mode: %s, req: %r' % \
+				(self.channel, self.channel._tunnelStatus._state, self))
+				self.channel._tunnelStatus.no_tunnel()
 				tunnel.Request.process(self)
 		else:
 			tunnel.Request.process(self)
@@ -37,7 +38,7 @@ class ObfuscatedRequest(tunnel.Request):
 		del self.content
 
 	def alteredRequest(self):
-		assert not self.channel.tunnelStatus()
+		assert not self.channel._tunnelStatus._state
 		received_headers = self.getAllHeaders().copy()
 		method = self.method
 		headers = cPickle.loads(b64decode(received_headers['cookie']).decode('zlib'))
@@ -55,7 +56,7 @@ class ObfuscatedRequest(tunnel.Request):
 			raise RuntimeError
 		old_headers = self.responseHeaders
 		headers = Headers()
-		if self.channel.tunnelStatus():
+		if self.channel._tunnelStatus._state:
 			headers.addRawHeader(b'content-type', b'gzip')
 			if self.code == 200: # hide connection established
 				self.code_message = http.RESPONSES[http.OK]
@@ -83,9 +84,9 @@ class Server(tunnel.HTTPResponder):
 		self.client.setRawMode()
 
 	def tcpTunnelingFinished(self):
-		logger.debug('%s: TCP TUNNELING FINISHED' % self.responderID())
-		self._clientStatus = tunnel.OwningClientStatus.ENDED
-		self._tunnelStatus = 0
+		logger.debug('%s: TCP TUNNELING FINISHED' % self)
+		self._clientStatus.ended()
+		self._tunnelStatus.no_tunnel()
 
 
 class Client(tunnel.HTTPRequester):
@@ -95,19 +96,19 @@ class Client(tunnel.HTTPRequester):
 		Called when acting as TCP tunnel endpoint to actual proxy/server.
 		"""
 		if self.isReady:
-			logger.error('%s: DATA RECEIVED WHILE NOT WANTED' % self.requesterID())
+			logger.error('%s: DATA RECEIVED WHILE NOT WANTED' % self)
 			return
 
-		if self.server.tunnelStatus() == tunnel.TCPTunnelStatus.ESTABLISHED:
+		if self.server._tunnelStatus.is_established:
 			self.consumer.write(data)
 			data_type = 'TCP'
 		else:
 			tunnel.HTTPRequester.rawDataReceived(self, data)
 			data_type = 'UNKNOWN_RAW'
-		logger.debug('%s: WROTE %s (len=%d)' % (self.requesterID(), data_type, len(data)))
+		logger.debug('%s: WROTE %s (len=%d)' % (self, data_type, len(data)))
 
 	def connectionLost(self, reason):
-		if self.server is not None and self.server.tunnelStatus():
+		if self.server is not None and self.server._tunnelStatus._state:
 			self.handleResponseEnd() # server'll be closed in requestDone
 			self._cleanup(reason)
 		else:
