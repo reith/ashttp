@@ -9,13 +9,14 @@ Tunnel, Gateway to talk with server:
               |   +--------+      +--------+   |
    (A)        +--------------------------------+       (B)
 
-If (A) supports talking with CONNECT and (B) be capable of serving it, this can
+If (A) supports talking with CONNECT and (B) is capable of serving it, this can
 be used to pass TCP streams (e.g SSL, SSH) Although traffic passed between
 tunnel endpoints are not CONNECT packets. Actually you can change shape of data
-(adding encryption, fake headers reformatting) in alterResponse() and
-alteredRequest(). If the firewall which you're trying to bypass, has some
-limitations on TCP connections, you might want to change connection pool options
-too, otherwise probably it's be better to turn it off utterly. 
+(adding encryption, authentication or fake headers reformatting) in
+alterResponse() and alteredRequest(). If the firewall which you're trying to
+bypass, has some limitations on TCP connections, you might want to change
+connection pool options too, otherwise probably it is better to turn it off
+utterly.
 
 Provide proper arguments to `ashttpc` or `ashttps` according to your network
 setup.
