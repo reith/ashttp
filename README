@@ -10,7 +10,7 @@ Tunnel, Gateway to talk with server:
    (A)        +--------------------------------+       (B)
 
 If (A) supports talking with CONNECT and (B) is capable of serving it, this can
-be used to pass TCP streams (e.g SSL, SSH) Although traffic passed between
+be used to pass TCP streams (e.g SSL, SSH) although traffic passed between
 tunnel endpoints are not CONNECT packets. Actually you can change shape of data
 (adding encryption, authentication or fake headers reformatting) in
 alterResponse() and alteredRequest(). If the firewall which you're trying to
@@ -18,5 +18,29 @@ bypass, has some limitations on TCP connections, you might want to change
 connection pool options too, otherwise probably it is better to turn it off
 utterly.
 
-Provide proper arguments to `ashttpc` or `ashttps` according to your network
-setup.
+
+Install
+-------
+`python setup.py install`
+
+
+Usage
+-----
+See `ashttpc --help` or `ashttps --help` and provide proper arguments according
+to your network setup.
+
+Assuming on your server machine, you have some proxy server on port 3128, run
+here:
+
+`ashttps <server_port> -P 127.0.0.1:3128 -t -l t.log`
+
+This will start server program listening on port <server_port> using twistd
+daemonizer (switch -t) and passes `-l t.log` to it.
+
+Then, on client machine run:
+
+`ashttpc <client_port> <server_ip>:<server_port> -t`
+
+Will launch client software listening on <client_port> and makes tunnel to
+server. Softwares could use this tunnel now by using HTTP proxy
+127.0.0.1:<client_port>
