@@ -77,7 +77,6 @@ class Server(tunnel.HTTPResponder):
 			http.HTTPChannel.rawDataReceived(self, data)
 	
 	def tcpTunnelingStarted(self):
-		self.transport.write(b'\r\n')
 		self.setRawMode()
 		self.client.consumer = self.transport
 		self.setTimeout(None)
